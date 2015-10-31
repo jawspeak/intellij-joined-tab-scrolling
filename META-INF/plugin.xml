@@ -36,5 +36,14 @@
     </project-components>
 
     <actions>
+        <!-- right clink on the tab to run it. -->
+        <!-- random debugging help. don't need this anymore. But here for records.
+        <action id="com.jawspeak.intellij.WaysToGetEditorsAndWindows"
+                class="com.jawspeak.intellij.WaysToGetEditorsAndWindows"
+                text="Test WaysToGetEditorsAndWindows"
+                description="test scrollBetween ... etc">
+            <add-to-group group-id="EditorTabPopupMenu"/>
+        </action>
+        -->
     </actions>
 </idea-plugin>
