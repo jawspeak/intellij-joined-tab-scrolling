@@ -1,6 +1,5 @@
 package com.jawspeak.intellij;
 
-import com.google.common.base.Joiner;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.intellij.openapi.diagnostic.Logger;
@@ -13,7 +12,6 @@ import com.intellij.openapi.editor.event.VisibleAreaListener;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import java.awt.Point;
 import java.util.Arrays;
@@ -29,65 +27,50 @@ import org.jetbrains.annotations.NotNull;
  * others to stay in sync.
  * With inspiration from SyncScrollSupport.java in intellij CE source.
  */
-
 public class JoinedScroller implements FileEditorManagerListener, VisibleAreaListener {
   private final static Logger logger = Logger.getInstance(JoinedScroller.class.getName());
-  private Project project;
+
   private Map<String, List<Editor>> activeEditors = new HashMap<>();
-  // if we are actively syncing the scrolling, don't let events keep triggering us.
-  private boolean isActivelySyncing = false;
   // TODO can i have these? does Editor implement hashcode / equals?
-
-
-  public JoinedScroller(Project project) {
-    this.project = project;
-  }
 
   @Override
   public void fileOpened(FileEditorManager source, VirtualFile file) {
-
     Editor editor = source.getSelectedTextEditor();
 
     int line = editor.getSelectionModel().getSelectionStartPosition().line;
-    logger.warn("just opened " + file.getCanonicalPath() + ", at logical line " + line +
+    logger.info("just opened " + file.getCanonicalPath() + ", at logical line " + line +
         " editor is " + editor);
 
-    // Map<VirtualFile, List<Editors>>
-    // If is it a duplicate of a file we already have open?
-    //    then add it to the list of all for
-    Collection<String> c = Collections2.transform(Arrays.asList(source.getSelectedFiles()),
+    Collection<String> openFiles = Collections2.transform(Arrays.asList(source.getSelectedFiles()),
         virtualFile -> virtualFile.getCanonicalPath());
-
-    logger.warn("  " + Joiner.on(" AND ").join(c));
-
-    if (c.size() > 1 || c.size() == 0) {
-      logger.error("Somehow collection is > 1 OR = 0. contents: " + c);
+    if (openFiles.size() > 1 || openFiles.size() == 0) {
+      logger.warn("Unexpected: Somehow collection is > 1 OR = 0. contents: " + openFiles);
     }
-    String filePath = c.iterator().next();
+    String filePath = openFiles.iterator().next();
     if (activeEditors.containsKey(filePath)) {
       activeEditors.get(filePath).add(editor);
     } else {
       activeEditors.put(filePath, Lists.newArrayList(editor));
     }
-    logger.warn("Active editors now: " + activeEditors);
+    logger.info("Active editors now: " + activeEditors);
 
     editor.getScrollingModel().addVisibleAreaListener(this);
   }
 
   @Override
   public void fileClosed(FileEditorManager source, VirtualFile file) {
-    logger.warn("just closed " + file.getCanonicalPath());
+    logger.info("just closed file: " + file.getCanonicalPath());
 
-    Editor[] remaining = EditorFactory.getInstance().getAllEditors();
+    Editor[] allRemaining = EditorFactory.getInstance().getAllEditors();
     List<Editor> editors = activeEditors.get(file.getCanonicalPath());
     boolean removed = false;
     for (int i = 0; i < editors.size(); i++) {
       boolean found = false;
-      for (int j = 0; j < remaining.length; j++) {
-         if (editors.get(i) == remaining[j]) {
-           found = true;
-           break;
-         }
+      for (Editor remaining : allRemaining) {
+        if (editors.get(i) == remaining) {
+          found = true;
+          break;
+        }
       }
       if (!found) {
         editors.remove(i);
@@ -97,7 +80,7 @@ public class JoinedScroller implements FileEditorManagerListener, VisibleAreaLis
     if (!removed) {
       logger.error("Did not remove closed editor! Why?");
     }
-    logger.warn("Active editors now: " + activeEditors);
+    logger.info("Active editors now: " + activeEditors);
   }
 
   @Override
@@ -107,16 +90,8 @@ public class JoinedScroller implements FileEditorManagerListener, VisibleAreaLis
 
   @Override
   public void visibleAreaChanged(VisibleAreaEvent e) {
-    if (isActivelySyncing) {
-      return; // ignore to prevent a loop (?)
-    }
-    isActivelySyncing = true;
-
     Editor thisEditor = e.getEditor();
     thisEditor.getScrollingModel().removeVisibleAreaListener(this);
-
-    // I could use this to get all of them, and map them back to the VirtualFile.
-    //EditorFactory.getInstance().getAllEditors()
 
     // inefficient
     for (Map.Entry<String, List<Editor>> activeEditorEntries : activeEditors.entrySet()) {
@@ -133,16 +108,11 @@ public class JoinedScroller implements FileEditorManagerListener, VisibleAreaLis
       }
     }
 
-    // could do this too to prevent feedback (unless it buffers events)
+    // prevent feedback loop
     thisEditor.getScrollingModel().addVisibleAreaListener(this);
-    isActivelySyncing = false;
   }
 
-
   private void syncJoinedTabScrolling(String filePathWeAreWorkingOn /*used for logging and debugging. hack hack hack.*/, Editor masterEditor, List<Editor> allTheseEditors) {
-    ScrollingModel masterScrollingModel = masterEditor.getScrollingModel();
-    int masterVerticalScrollOffset = masterScrollingModel.getVerticalScrollOffset();
-
     int masterIndex = -1;
     // TODO later can make more efficient w/ a doubly linked list or something.
     for (int i = 0; i < allTheseEditors.size(); i++) {
@@ -166,24 +136,27 @@ public class JoinedScroller implements FileEditorManagerListener, VisibleAreaLis
     // only scroll one to the left or right because events will cascade onward to others.
     if (masterIndex - 1 >= 0) {
       int directionCoefficient = -1;
-      scroll(masterEditor, allTheseEditors, masterScrollingModel, masterVerticalScrollOffset, masterIndex - 1, directionCoefficient);
+      scroll(masterEditor, allTheseEditors, masterIndex - 1, directionCoefficient);
     }
 
     if (masterIndex + 1 < allTheseEditors.size()) {
       int directionCoefficient = +1;
-      scroll(masterEditor, allTheseEditors, masterScrollingModel, masterVerticalScrollOffset, masterIndex + 1, directionCoefficient);
+      scroll(masterEditor, allTheseEditors, masterIndex + 1, directionCoefficient);
     }
   }
 
   // With inspiration from SyncScrollSupport.java in intellij CE source.
-  private void scroll(Editor masterEditor, List<Editor> allTheseEditors, ScrollingModel masterScrollingModel, int masterVerticalScrollOffset, int i, int directionCoefficient) {
+  private void scroll(Editor masterEditor, List<Editor> allTheseEditors, int i, int directionCoefficient) {
+    ScrollingModel masterScrollingModel = masterEditor.getScrollingModel();
+    int masterVerticalScrollOffset = masterScrollingModel.getVerticalScrollOffset();
+
     Editor slave = allTheseEditors.get(i);
     ScrollingModel slaveScrollingModel = slave.getScrollingModel();
     int slaveVerticalScrollOffset = slaveScrollingModel.getVerticalScrollOffset();
 
     LogicalPosition masterPos = masterEditor.xyToLogicalPosition(
           new Point(masterScrollingModel.getVisibleArea().x, masterVerticalScrollOffset));
-    int masterTopLine = masterPos.line;
+    int masterTopLine = masterPos.line - directionCoefficient; // move the top line so we have a bit of line overlap.
 
     LogicalPosition slavePos = slave.xyToLogicalPosition(
         new Point(slaveScrollingModel.getVisibleArea().x, slaveVerticalScrollOffset));
@@ -193,7 +166,7 @@ public class JoinedScroller implements FileEditorManagerListener, VisibleAreaLis
     int slaveHeight = slaveBottomLine - slaveTopLine;
     // for slaves their top offset should = convertFromLines(master_line - 1 - size_of_slave_in_lines)
     int scrollToLine = Math.max(0, masterTopLine + directionCoefficient + directionCoefficient * slaveHeight);
-    logger.warn("masterTopLine=" + masterTopLine + " slaveHeight=" + slaveHeight + " slaveTopLine=" + slaveTopLine + " scrollToLine=" + scrollToLine);
+    logger.info("masterTopLine=" + masterTopLine + " slaveHeight=" + slaveHeight + " slaveTopLine=" + slaveTopLine + " scrollToLine=" + scrollToLine);
 
     int correction = (masterVerticalScrollOffset) % masterEditor.getLineHeight();
     Point point = slave.logicalPositionToXY(new LogicalPosition(scrollToLine, masterPos.column));
