@@ -1,0 +1,40 @@
+<idea-plugin version="2">
+    <id>com.jawspeak.joined-tab-scrolling</id>
+    <name>Jonied / Wraparound / Continuous Tab Scrolling</name>
+    <version>0.1</version>
+    <vendor email="jaw@jawspeak.com" url="http://www.jawspeak.com">Jonathan Wolter</vendor>
+
+    <description><![CDATA[
+      Let multiple tabs scroll continuously together. Two side by side let you see more code in context on a widescreen monitor. (Or have multiple, not limited to two).<br>
+
+      Works great with <a href="https://github.com/Vektah/CodeGlance">CodeGlance</a> for a Sublime style preview pane in the right gutter.<br>
+
+      TODO - lots more.
+    ]]></description>
+
+    <change-notes><![CDATA[
+      0.1
+      Very basic version that just works to demo the idea of continuous/joined scrolling.<br>
+    ]]>
+    </change-notes>
+
+    <!-- please see https://confluence.jetbrains.com/display/IDEADEV/Build+Number+Ranges for description -->
+    <idea-version since-build="131"/>
+
+    <depends>com.intellij.modules.lang</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Add your extensions here -->
+    </extensions>
+
+    <application-components>
+        <!-- Add your application components here -->
+    </application-components>
+
+    <project-components>
+        <component><implementation-class>com.jawspeak.intellij.JoinedTabScrolling</implementation-class></component>
+    </project-components>
+
+    <actions>
+    </actions>
+</idea-plugin>
