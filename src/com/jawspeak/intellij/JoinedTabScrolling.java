@@ -2,6 +2,7 @@ package com.jawspeak.intellij;
 
 import com.intellij.openapi.components.ProjectComponent;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import org.jetbrains.annotations.NotNull;
@@ -16,7 +17,7 @@ public class JoinedTabScrolling implements ProjectComponent {
 
   public JoinedTabScrolling(Project project) {
     this.project = project;
-    listener = new JoinedScroller();
+    listener = new JoinedScroller(project);
   }
 
   @Override
@@ -32,6 +33,7 @@ public class JoinedTabScrolling implements ProjectComponent {
   @Override
   public void initComponent() {
     project.getMessageBus().connect().subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, listener);
+    EditorFactory.getInstance().addEditorFactoryListener(listener);
     logger.info("project initialized");
   }
 

@@ -1,7 +1,7 @@
 <idea-plugin version="2">
     <id>com.jawspeak.joined-tab-scrolling</id>
-    <name>Jonied / Wraparound / Continuous Tab Scrolling</name>
-    <version>0.1</version>
+    <name>Joined / Wraparound / Continuous Tab Scrolling</name>
+    <version>0.1-alpha</version>
     <vendor email="jaw@jawspeak.com" url="http://www.jawspeak.com">Jonathan Wolter</vendor>
 
     <description><![CDATA[
@@ -10,10 +10,11 @@
       Works great with <a href="https://github.com/Vektah/CodeGlance">CodeGlance</a> for a Sublime style preview pane in the right gutter.<br>
 
       TODO - lots more.
+      This is Alpha, so may be buggy
     ]]></description>
 
     <change-notes><![CDATA[
-      0.1
+      0.1-alpha
       Very basic version that just works to demo the idea of continuous/joined scrolling.<br>
     ]]>
     </change-notes>

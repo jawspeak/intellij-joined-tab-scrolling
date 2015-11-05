@@ -9,3 +9,4 @@ Several places to read more about these API's used to manipulate Editors / tabs.
 * https://github.com/siosio/FileOpenPlugin/blob/master/src/siosio/fileopen/OpenRightTabAction.kt
 * https://github.com/mjedynak/File-Name-Grabber
 * https://github.com/alp82/idea-tabsession/blob/master/src/com/squiek/idea/plugin/tabsession/SessionComponent.java
+see plugin.xml
