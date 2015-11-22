@@ -1,6 +1,6 @@
 package com.jawspeak.intellij;
 
-import com.google.common.base.Preconditions;
+import com.google.common.base.Joiner;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
@@ -19,14 +19,13 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.ReflectionUtil;
 import java.awt.Point;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 import org.jetbrains.annotations.NotNull;
@@ -107,24 +106,19 @@ public class JoinedScroller
   @Override
   public void visibleAreaChanged(VisibleAreaEvent event) {
     Editor masterEditor = event.getEditor();
-
-    // TODO kinda ugly adding and removing this. can't forget to add back.
-    masterEditor.getScrollingModel().removeVisibleAreaListener(this);
-
     VirtualFile virtualFile = FileDocumentManager.getInstance().getFile(masterEditor.getDocument());
-    List<Editor> allTheseShowingEditors =
-        Arrays.asList(EditorFactory.getInstance().getEditors(masterEditor.getDocument()))
-            .stream()
-            .filter(e -> e.getComponent().isShowing())
-            .collect(Collectors.toList());;
+
+    List<Editor> allTheseShowingEditors = new ArrayList<>();
+    for (Editor e : EditorFactory.getInstance().getEditors(masterEditor.getDocument())) {
+      if (e.getComponent().isShowing()) {
+        allTheseShowingEditors.add(e);
+      }
+    }
 
     if (allTheseShowingEditors.size() < 2) {
       logger.info("visibleAreaChanged: <2 showing editors for file="
           + (virtualFile != null ? virtualFile.getCanonicalPath() : "<null>")
           + " editors=" + listShortObjects(allTheseShowingEditors));
-
-      // Re-enable listener.
-      masterEditor.getScrollingModel().addVisibleAreaListener(this);
       return;
     }
 
@@ -132,6 +126,9 @@ public class JoinedScroller
     // TODO thread concurrency issues? Likely if scrolling / events happen fast enough.
     SwingUtilities.invokeLater(() -> {
       try {
+        // Disable while we move things.
+        masterEditor.getScrollingModel().removeVisibleAreaListener(JoinedScroller.this);
+
         // sort all editors by their location on the screen Left to Right, Top to Bottom.
         Collections.sort(allTheseShowingEditors, (e1, e2) -> {
           if (!e1.getComponent().isShowing() || !e2.getComponent().isShowing()) {
@@ -233,16 +230,24 @@ public class JoinedScroller
   }
 
   private static void reflectivelyCheckCurrentListeners(String logLabel, Editor editor) {
-    if (editor.getScrollingModel().getClass().equals(ScrollingModelImpl.class)) {
-      List<VisibleAreaListener> listeners =
-          ReflectionUtil.getField(ScrollingModelImpl.class, editor.getScrollingModel(),
-              List.class, "myVisibleAreaListeners");
-      logger.info(logLabel + ": editor=" + shortObjectString(editor)
-          + " currentListeners=" + listShortObjects(listeners));
+    // Works in debug. Not in prod.
+    try {
+      if (editor.getScrollingModel().getClass().equals(ScrollingModelImpl.class)) {
+        List<VisibleAreaListener> listeners =
+            ReflectionUtil.getField(ScrollingModelImpl.class, editor.getScrollingModel(),
+                List.class, "myVisibleAreaListeners");
+        logger.info(logLabel + ": editor=" + shortObjectString(editor)
+            + " currentListeners=" + listShortObjects(listeners));
+      }
+    } catch (Exception e) {
+      logger.error("reflectivelyCheckCurrentListeners: error trying.", e);
     }
   }
 
   private static String shortObjectString(Object o) {
+    if (o == null) {
+      return "<null>";
+    }
     if (!o.toString().contains(".")) {
       return o.toString();
     }
@@ -250,9 +255,13 @@ public class JoinedScroller
   }
 
   private static String listShortObjects(Collection c) {
-    //return (String) l.stream().map(Object::toString).collect(Collectors.joining(","));
-    return (String) c.stream()
-        .map(JoinedScroller::shortObjectString)
-        .collect(Collectors.joining(","));
+    if (c == null) {
+      return "<unavailable>";
+    }
+    List<String> collector = new ArrayList<>();
+    for (Object o : c) {
+      collector.add(shortObjectString(o));
+    }
+    return Joiner.on(",").join(collector);
   }
 }

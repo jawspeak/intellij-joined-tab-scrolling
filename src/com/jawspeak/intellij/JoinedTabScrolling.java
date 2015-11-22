@@ -8,7 +8,7 @@ import com.intellij.openapi.project.Project;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Created by jaw on 10/25/15.
+ * Created by jaw on 10/25/15. See META-INF/plugin.xml for more info.
  */
 public class JoinedTabScrolling implements ProjectComponent {
   private static final Logger logger = Logger.getInstance("#" + JoinedTabScrolling.class.getName());
@@ -22,19 +22,20 @@ public class JoinedTabScrolling implements ProjectComponent {
 
   @Override
   public void projectOpened() {
-    logger.info("project opened " + project);
+    logger.info("projectOpened: project=" + project);
   }
 
   @Override
   public void projectClosed() {
-    logger.info("project closed " + project);
+    logger.info("projectClosed: project=" + project);
   }
 
   @Override
   public void initComponent() {
+    logger.info("initComponent: starting");
     project.getMessageBus().connect().subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, listener);
     EditorFactory.getInstance().addEditorFactoryListener(listener);
-    logger.info("project initialized");
+    logger.info("initComponent: done");
   }
 
   @Override

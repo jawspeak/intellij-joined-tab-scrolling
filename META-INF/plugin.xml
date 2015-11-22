@@ -1,7 +1,7 @@
 <idea-plugin version="2">
   <id>com.jawspeak.joined-tab-scrolling</id>
   <name>Joined / Wraparound / Continuous Tab Scrolling</name>
-  <version>0.2-alpha</version>
+  <version>0.3-alpha</version>
   <vendor url="https://github.com/jawspeak/intellij-joined-tab-scrolling/issues">Joined Tab Scrolling issue tracker</vendor>
 
   <description><![CDATA[
@@ -14,6 +14,7 @@
     ]]></description>
 
   <change-notes><![CDATA[
+      0.3-alpha: Fixed startup bug in Intellij IDEA 15 because of bad plugin zip. Also no longer using lamdas or streams.
       0.2-alpha: Fixed crash bug around JoinedScroller:70 releasing an editor that wasn't listening. Relies on you having java jdk 8 running for lambdas and streams.
       0.1-alpha: Very basic version that just works to demo the idea of continuous/joined scrolling.<br>
     ]]>
