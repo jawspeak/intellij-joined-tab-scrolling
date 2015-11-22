@@ -1,5 +1,6 @@
 package com.jawspeak.intellij;
 
+import com.google.common.base.Preconditions;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
@@ -9,32 +10,39 @@ import com.intellij.openapi.editor.event.EditorFactoryEvent;
 import com.intellij.openapi.editor.event.EditorFactoryListener;
 import com.intellij.openapi.editor.event.VisibleAreaEvent;
 import com.intellij.openapi.editor.event.VisibleAreaListener;
+import com.intellij.openapi.editor.impl.ScrollingModelImpl;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.util.ReflectionUtil;
 import java.awt.Point;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import javax.swing.JComponent;
+import javax.swing.SwingUtilities;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * Listens for scroll change events in "interested editors" (the split ones), and then moves the
  * others to stay in sync. With inspiration from my buddy Mike's request.
  */
-public class JoinedScroller implements FileEditorManagerListener, VisibleAreaListener, EditorFactoryListener {
+public class JoinedScroller
+    implements FileEditorManagerListener, VisibleAreaListener, EditorFactoryListener {
   private final static Logger logger = Logger.getInstance(JoinedScroller.class.getName());
   private final Set<Editor> openedEditors = new HashSet<>();
   private final static AtomicInteger openCount = new AtomicInteger();
   private final static AtomicInteger closedCount = new AtomicInteger();
+  private final static AtomicInteger editorCreatedCount = new AtomicInteger();
+  private final static AtomicInteger editorReleasedCount = new AtomicInteger();
   private final Project project;
 
   public JoinedScroller(Project project) {
@@ -43,34 +51,51 @@ public class JoinedScroller implements FileEditorManagerListener, VisibleAreaLis
 
   @Override
   public void fileOpened(FileEditorManager source, VirtualFile file) {
-    logger.info("fileOpened opened file: " + file.getCanonicalPath() + " opened count " + openCount.incrementAndGet());
+    logger.info("fileOpened: opened file=" + file.getCanonicalPath()
+        + " openedCount=" + openCount.incrementAndGet());
   }
 
   @Override
   public void fileClosed(FileEditorManager source, VirtualFile file) {
     // no-op handle editors closing below.
-    logger.info("fileClosed just closed file: " + file.getCanonicalPath() + " closed count " + closedCount.incrementAndGet());
+    logger.info("fileClosed: closed file=" + file.getCanonicalPath()
+        + " closedCount=" + closedCount.incrementAndGet());
   }
 
   @Override
   public void editorCreated(@NotNull EditorFactoryEvent event) {
     Editor editor = event.getEditor();
-    // TODO I think there may be a bug sometimes where we aren't listening to an editor.
     if (!openedEditors.contains(editor)) {
+      reflectivelyCheckCurrentListeners("editorCreated.before", editor);
       openedEditors.add(editor);
       editor.getScrollingModel().addVisibleAreaListener(this);
+
+      logger.info("editorCreated: createdCount=" + editorCreatedCount.incrementAndGet()
+          + " listening for editor=" + shortObjectString(editor)
+          + " openedEditors=" + listShortObjects(openedEditors));
+      reflectivelyCheckCurrentListeners("editorCreated.after", editor);
     } else {
-      logger.warn("editorCreated already contains editor: (should not happen) " + editor);
+      logger.warn("editorCreated: createdCount=" + editorCreatedCount.incrementAndGet()
+          + " (should not happen) already contains editor=" + shortObjectString(editor));
     }
   }
 
   @Override
   public void editorReleased(@NotNull EditorFactoryEvent event) {
-    if (openedEditors.contains(event.getEditor())) {
-      event.getEditor().getScrollingModel().removeVisibleAreaListener(this);
-      openedEditors.remove(event.getEditor());
+    Editor editor = event.getEditor();
+    if (openedEditors.contains(editor)) {
+      logger.info("editorReleased: releasedCount=" + editorReleasedCount.incrementAndGet()
+          + " removed listener for editor=" + shortObjectString(editor)
+          + " openedEditors=" + listShortObjects(openedEditors));
+      reflectivelyCheckCurrentListeners("editorReleased.before", editor);
+
+      editor.getScrollingModel().removeVisibleAreaListener(this);
+      openedEditors.remove(editor);
+      reflectivelyCheckCurrentListeners("editorReleased.after", editor);
     } else {
-      logger.warn("editorReleased released editor we were not tracking. (should not happen)");
+      logger.warn("editorReleased: releasedCount=" + editorReleasedCount.incrementAndGet()
+          + " (should not happen) released editor we were not tracking editor="
+          + shortObjectString(editor));
     }
   }
 
@@ -82,38 +107,51 @@ public class JoinedScroller implements FileEditorManagerListener, VisibleAreaLis
   @Override
   public void visibleAreaChanged(VisibleAreaEvent event) {
     Editor masterEditor = event.getEditor();
+
+    // TODO kinda ugly adding and removing this. can't forget to add back.
     masterEditor.getScrollingModel().removeVisibleAreaListener(this);
 
     VirtualFile virtualFile = FileDocumentManager.getInstance().getFile(masterEditor.getDocument());
-
-    //EditorFactory.getInstance().getAllEditors()
-    List<Editor> allTheseEditors = Arrays.asList(EditorFactory.getInstance().getEditors(masterEditor.getDocument()));
+    List<Editor> allTheseEditors =
+        Arrays.asList(EditorFactory.getInstance().getEditors(masterEditor.getDocument()));
 
     if (allTheseEditors.size() < 2) {
-      logger.info("<2 editors for file: " + virtualFile.getCanonicalPath() + " editors: " + allTheseEditors);
+      logger.info("visibleAreaChanged: <2 editors for file: "
+          + (virtualFile != null ? virtualFile.getCanonicalPath() : "<null>")
+          + " editors: " + listShortObjects(allTheseEditors));
+
+      // Re-enable listener.
+      masterEditor.getScrollingModel().addVisibleAreaListener(JoinedScroller.this);
       return;
     }
 
-    // sort all editors by their location on the screen Left to Right, Top to Bottom.
-    Collections.sort(allTheseEditors, (e1, e2) -> {
-      if (!e1.getComponent().isVisible() || !e2.getComponent().isVisible()) {
-        return 0; // don't try to look when not on the screen.
-      }
-      Point e1Location = e1.getComponent().getLocationOnScreen();
-      Point e2Location = e2.getComponent().getLocationOnScreen();
-      if (e1Location.getX() != e2Location.getX()) {
-        return (int) (e1Location.getX() - e2Location.getX());
-      }
-      return (int) (e1Location.getY() - e2Location.getY());
-    });
-    syncJoinedTabScrolling(virtualFile.getCanonicalPath(), masterEditor, allTheseEditors);
+    // I think we are supposed to do this with Swing... Didn't pay much attention.
+    // TODO thread concurrency issues? Likely if scrolling / events happen fast enough.
+    SwingUtilities.invokeLater(() -> {
+      try {
+        // sort all editors by their location on the screen Left to Right, Top to Bottom.
+        Collections.sort(allTheseEditors, (e1, e2) -> {
+          if (!e1.getComponent().isShowing() || !e2.getComponent().isShowing()) {
+            return 0; // don't try to look when not on the screen.
+          }
+          Point e1Location = e1.getComponent().getLocationOnScreen();
+          Point e2Location = e2.getComponent().getLocationOnScreen();
+          if (e1Location.getX() != e2Location.getX()) {
+            return (int) (e1Location.getX() - e2Location.getX());
+          }
+          return (int) (e1Location.getY() - e2Location.getY());
+        });
+        syncJoinedTabScrolling(virtualFile.getCanonicalPath(), masterEditor, allTheseEditors);
 
-    // Re-enable listener.
-    masterEditor.getScrollingModel().addVisibleAreaListener(this);
+      } finally {
+        // Re-enable listener.
+        masterEditor.getScrollingModel().addVisibleAreaListener(JoinedScroller.this);
+      }
+    });
   }
 
-  private void syncJoinedTabScrolling(String filePathWeAreWorkingOn /*used for logging and debugging. hack hack hack.*/,
-                                      Editor masterEditor, List<Editor> allTheseEditors) {
+  private static void syncJoinedTabScrolling(String filePathWeAreWorkingOn /*used for logging and debugging. hack hack hack.*/,
+      Editor masterEditor, List<Editor> allTheseEditors) {
     int masterIndex = -1;
     // TODO later can make more efficient w/ a doubly linked list or something.
     for (int i = 0; i < allTheseEditors.size(); i++) {
@@ -139,7 +177,8 @@ public class JoinedScroller implements FileEditorManagerListener, VisibleAreaLis
   }
 
   // With inspiration from SyncScrollSupport.java in intellij CE source.
-  private void scroll(Editor masterEditor, List<Editor> allTheseEditors, int i, int directionCoefficient) {
+  private static void scroll(Editor masterEditor, List<Editor> allTheseEditors, int i,
+      int directionCoefficient) {
     ScrollingModel masterScrollingModel = masterEditor.getScrollingModel();
     int masterVerticalScrollOffset = masterScrollingModel.getVerticalScrollOffset();
 
@@ -149,17 +188,24 @@ public class JoinedScroller implements FileEditorManagerListener, VisibleAreaLis
 
     LogicalPosition masterPos = masterEditor.xyToLogicalPosition(
         new Point(masterScrollingModel.getVisibleArea().x, masterVerticalScrollOffset));
-    int masterTopLine = masterPos.line - 2 * directionCoefficient; // move the top line so we have a bit of line overlap.
+    int masterTopLine = masterPos.line
+        - 2 * directionCoefficient; // move the top line so we have a bit of line overlap.
 
     LogicalPosition slavePos = slave.xyToLogicalPosition(
         new Point(slaveScrollingModel.getVisibleArea().x, slaveVerticalScrollOffset));
     int slaveTopLine = slavePos.line;
     int slaveBottomLine = slave.xyToLogicalPosition(
-        new Point(slaveScrollingModel.getVisibleArea().x, slaveVerticalScrollOffset + slaveScrollingModel.getVisibleArea().height)).line;
+        new Point(slaveScrollingModel.getVisibleArea().x,
+            slaveVerticalScrollOffset + slaveScrollingModel.getVisibleArea().height)).line;
     int slaveHeight = slaveBottomLine - slaveTopLine;
     // for slaves their top offset should = convertFromLines(master_line - 1 - size_of_slave_in_lines)
-    int scrollToLine = Math.max(0, masterTopLine + directionCoefficient + directionCoefficient * slaveHeight);
-    logger.info("master=" + masterEditor.toString().substring(masterEditor.toString().length() - 10) + " masterTopLine=" + masterTopLine + " slaveHeight=" + slaveHeight + " slaveTopLine=" + slaveTopLine + " scrollToLine=" + scrollToLine);
+    int scrollToLine =
+        Math.max(0, masterTopLine + directionCoefficient + directionCoefficient * slaveHeight);
+    logger.debug("scroll: master=" + shortObjectString(masterEditor)
+        + " masterTopLine=" + masterTopLine
+        + " slaveHeight=" + slaveHeight
+        + " slaveTopLine=" + slaveTopLine
+        + " scrollToLine=" + scrollToLine);
 
     int correction = (masterVerticalScrollOffset) % masterEditor.getLineHeight();
     Point point = slave.logicalPositionToXY(new LogicalPosition(scrollToLine, masterPos.column));
@@ -181,5 +227,29 @@ public class JoinedScroller implements FileEditorManagerListener, VisibleAreaLis
   private static int getHeaderOffset(@NotNull final Editor editor) {
     final JComponent header = editor.getHeaderComponent();
     return header == null ? 0 : header.getHeight();
+  }
+
+  private static void reflectivelyCheckCurrentListeners(String logLabel, Editor editor) {
+    if (editor.getScrollingModel().getClass().equals(ScrollingModelImpl.class)) {
+      List<VisibleAreaListener> listeners =
+          ReflectionUtil.getField(ScrollingModelImpl.class, editor.getScrollingModel(),
+              List.class, "myVisibleAreaListeners");
+      logger.info(logLabel + ": editor=" + shortObjectString(editor)
+          + " currentListeners=" + listShortObjects(listeners));
+    }
+  }
+
+  private static String shortObjectString(Object o) {
+    if (!o.toString().contains(".")) {
+      return o.toString();
+    }
+    return o.toString().substring(o.toString().lastIndexOf('.') + 1);
+  }
+
+  private static String listShortObjects(Collection c) {
+    //return (String) l.stream().map(Object::toString).collect(Collectors.joining(","));
+    return (String) c.stream()
+        .map(JoinedScroller::shortObjectString)
+        .collect(Collectors.joining(","));
   }
 }

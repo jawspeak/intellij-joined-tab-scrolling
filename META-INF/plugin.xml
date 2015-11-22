@@ -1,50 +1,52 @@
 <idea-plugin version="2">
-    <id>com.jawspeak.joined-tab-scrolling</id>
-    <name>Joined / Wraparound / Continuous Tab Scrolling</name>
-    <version>0.1-alpha</version>
-    <vendor email="jaw@jawspeak.com" url="http://www.jawspeak.com">Jonathan Wolter</vendor>
+  <id>com.jawspeak.joined-tab-scrolling</id>
+  <name>Joined / Wraparound / Continuous Tab Scrolling</name>
+  <version>0.2-alpha</version>
+  <vendor url="https://github.com/jawspeak/intellij-joined-tab-scrolling/issues">Joined Tab Scrolling issue tracker</vendor>
 
-    <description><![CDATA[
-      Let multiple tabs scroll continuously together. Two side by side let you see more code in context on a widescreen monitor. (Or have multiple, not limited to two).<br>
+  <description><![CDATA[
+      <p>Let multiple tabs scroll continuously together. Two side by side let you see more code in context on a widescreen monitor. (Or have multiple, not limited to two).</p>
 
-      Works great with <a href="https://github.com/Vektah/CodeGlance">CodeGlance</a> for a Sublime style preview pane in the right gutter.<br>
+      <p>Works great with <a href="https://github.com/Vektah/CodeGlance">CodeGlance</a> for a Sublime style preview pane in the right gutter.</p>
 
-      TODO - lots more.
-      This is Alpha, so may be buggy
+      <p>TODO - lots more.<br>
+      This is Alpha, so may be buggy. Report any issues here: <a href="https://github.com/jawspeak/intellij-joined-tab-scrolling/issues">https://github.com/jawspeak/intellij-joined-tab-scrolling/issues</a>.</p>
     ]]></description>
 
-    <change-notes><![CDATA[
-      0.1-alpha
-      Very basic version that just works to demo the idea of continuous/joined scrolling.<br>
+  <change-notes><![CDATA[
+      0.2-alpha: Fixed crash bug around JoinedScroller:70 releasing an editor that wasn't listening. Relies on you having java jdk 8 running for lambdas and streams.
+      0.1-alpha: Very basic version that just works to demo the idea of continuous/joined scrolling.<br>
     ]]>
-    </change-notes>
+  </change-notes>
 
-    <!-- please see https://confluence.jetbrains.com/display/IDEADEV/Build+Number+Ranges for description -->
-    <idea-version since-build="131"/>
+  <!-- please see https://confluence.jetbrains.com/display/IDEADEV/Build+Number+Ranges for description -->
+  <idea-version since-build="131"/>
 
-    <depends>com.intellij.modules.lang</depends>
+  <depends>com.intellij.modules.lang</depends>
 
-    <extensions defaultExtensionNs="com.intellij">
-        <!-- Add your extensions here -->
-    </extensions>
+  <extensions defaultExtensionNs="com.intellij">
+    <!-- Add your extensions here -->
+  </extensions>
 
-    <application-components>
-        <!-- Add your application components here -->
-    </application-components>
+  <application-components>
+    <!-- Add your application components here -->
+  </application-components>
 
-    <project-components>
-        <component><implementation-class>com.jawspeak.intellij.JoinedTabScrolling</implementation-class></component>
-    </project-components>
+  <project-components>
+    <component>
+      <implementation-class>com.jawspeak.intellij.JoinedTabScrolling</implementation-class>
+    </component>
+  </project-components>
 
-    <actions>
-        <!-- right clink on the tab to run it. -->
-        <!-- random debugging help. don't need this anymore. But here for records.
-        <action id="com.jawspeak.intellij.WaysToGetEditorsAndWindows"
-                class="com.jawspeak.intellij.WaysToGetEditorsAndWindows"
-                text="Test WaysToGetEditorsAndWindows"
-                description="test scrollBetween ... etc">
-            <add-to-group group-id="EditorTabPopupMenu"/>
-        </action>
-        -->
-    </actions>
+  <actions>
+    <!-- right clink on the tab to run it. -->
+    <!-- random debugging help. don't need this anymore. But here for records.
+    <action id="com.jawspeak.intellij.WaysToGetEditorsAndWindows"
+            class="com.jawspeak.intellij.WaysToGetEditorsAndWindows"
+            text="Test WaysToGetEditorsAndWindows"
+            description="test scrollBetween ... etc">
+        <add-to-group group-id="EditorTabPopupMenu"/>
+    </action>
+    -->
+  </actions>
 </idea-plugin>
