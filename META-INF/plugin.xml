@@ -5,8 +5,8 @@
   <vendor url="https://github.com/jawspeak/intellij-joined-tab-scrolling/issues">Joined Tab Scrolling issue tracker</vendor>
 
   <description><![CDATA[
-      <p>Let multiple tabs scroll continuously together. Two side by side let you see more code in context on a widescreen monitor. (Or have multiple, not limited to two).</p>
-
+      <p>Let multiple tabs scroll continuously together. Multiple side by side let you see more code in context on a widescreen monitor. (Or have multiple, not limited to two).</p>
+      <p>When you split editor tabs: scroll one window and the others automatically keep in sync.</p>
       <p>Works great with <a href="https://github.com/Vektah/CodeGlance">CodeGlance</a> for a Sublime style preview pane in the right gutter.</p>
 
       <p>TODO - lots more.<br>
@@ -14,7 +14,7 @@
     ]]></description>
 
   <change-notes><![CDATA[
-      0.3-alpha: Fixed startup bug in Intellij IDEA 15 because of bad plugin zip. Also no longer using lamdas or streams.
+      0.3-alpha: Fixed startup bug in Intellij IDEA 15 because of bad plugin zip. Also no longer using lamdas or streams. Rewrote scrolling logic.
       0.2-alpha: Fixed crash bug around JoinedScroller:70 releasing an editor that wasn't listening. Relies on you having java jdk 8 running for lambdas and streams.
       0.1-alpha: Very basic version that just works to demo the idea of continuous/joined scrolling.<br>
     ]]>

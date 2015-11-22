@@ -214,20 +214,20 @@ public class JoinedScroller
     EditorTopBottom slaveTopBottom = new EditorTopBottom(slave);
 
     // For slaves to the LEFT of master:  their new top line
-    //     = convertFromVisualLinesToXY(master_top_line - (size_of_slave_in_lines -1))
+    //     = convertFromVisualLinesToXY(master_top_line - (size_of_slave_in_lines - 2))
 
     // For slaves to the RIGHT of master: their new top line
-    //     = convertFromVisualLinesToXY(master_top_line + (size_of_master_in_lines - 1))
+    //     = convertFromVisualLinesToXY(master_top_line + (size_of_master_in_lines - 2))
 
-    // (-1 to give overlap in the two editors so 1 line is the same continuing b/w the two).
+    // (-2 to give overlap in the two editors so 1 line is the same continuing b/w the two).
 
     int slaveNewTopLine;
     switch (slavePosition) {
       case SLAVE_LEFT_OF_MASTER:
-        slaveNewTopLine = masterTopBottom.topLine - (slaveTopBottom.linesVisible - 1);
+        slaveNewTopLine = masterTopBottom.topLine - (slaveTopBottom.linesVisible - 2);
         break;
       case SLAVE_RIGHT_OF_MASTER:
-        slaveNewTopLine = masterTopBottom.topLine + (masterTopBottom.linesVisible - 1);
+        slaveNewTopLine = masterTopBottom.topLine + (masterTopBottom.linesVisible - 2);
         break;
       default:
         throw new RuntimeException("Invalid state - should never happen");
