@@ -112,16 +112,19 @@ public class JoinedScroller
     masterEditor.getScrollingModel().removeVisibleAreaListener(this);
 
     VirtualFile virtualFile = FileDocumentManager.getInstance().getFile(masterEditor.getDocument());
-    List<Editor> allTheseEditors =
-        Arrays.asList(EditorFactory.getInstance().getEditors(masterEditor.getDocument()));
+    List<Editor> allTheseShowingEditors =
+        Arrays.asList(EditorFactory.getInstance().getEditors(masterEditor.getDocument()))
+            .stream()
+            .filter(e -> e.getComponent().isShowing())
+            .collect(Collectors.toList());;
 
-    if (allTheseEditors.size() < 2) {
-      logger.info("visibleAreaChanged: <2 editors for file: "
+    if (allTheseShowingEditors.size() < 2) {
+      logger.info("visibleAreaChanged: <2 showing editors for file="
           + (virtualFile != null ? virtualFile.getCanonicalPath() : "<null>")
-          + " editors: " + listShortObjects(allTheseEditors));
+          + " editors=" + listShortObjects(allTheseShowingEditors));
 
       // Re-enable listener.
-      masterEditor.getScrollingModel().addVisibleAreaListener(JoinedScroller.this);
+      masterEditor.getScrollingModel().addVisibleAreaListener(this);
       return;
     }
 
@@ -130,7 +133,7 @@ public class JoinedScroller
     SwingUtilities.invokeLater(() -> {
       try {
         // sort all editors by their location on the screen Left to Right, Top to Bottom.
-        Collections.sort(allTheseEditors, (e1, e2) -> {
+        Collections.sort(allTheseShowingEditors, (e1, e2) -> {
           if (!e1.getComponent().isShowing() || !e2.getComponent().isShowing()) {
             return 0; // don't try to look when not on the screen.
           }
@@ -141,7 +144,7 @@ public class JoinedScroller
           }
           return (int) (e1Location.getY() - e2Location.getY());
         });
-        syncJoinedTabScrolling(virtualFile.getCanonicalPath(), masterEditor, allTheseEditors);
+        syncJoinedTabScrolling(virtualFile.getCanonicalPath(), masterEditor, allTheseShowingEditors);
 
       } finally {
         // Re-enable listener.
